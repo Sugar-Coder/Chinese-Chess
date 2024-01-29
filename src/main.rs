@@ -1,4 +1,4 @@
-use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
+use bevy::{prelude::*, window::PrimaryWindow};
 
 mod configs;
 mod pieces;
@@ -19,8 +19,9 @@ fn main() {
                 ..default()
             })
         )
+        .insert_resource(SelectedSquare(None))
         .add_systems(Startup, (setup, create_pieces))
-        .add_systems(Update, update_board_size)
+        .add_systems(Update, (update_board_size, mouse_click_system))
         .run();
 }
 
@@ -28,16 +29,19 @@ fn main() {
 struct ChessBoard;
 
 #[derive(Component)]
-struct GridPoint {
-    pub x: u8,
-    pub y: u8,
-}
+struct MainCamera;
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Pos(pub u8, pub u8);
+
+#[derive(Resource, Default)]
+struct SelectedSquare(Option<Pos>);
 
 fn setup(
     mut commands: Commands,
     asset_server: Res<AssetServer>
 ) {
-    commands.spawn(Camera2dBundle::default());
+    commands.spawn((Camera2dBundle::default(), MainCamera));
     commands.spawn((
         SpriteBundle{
             texture: asset_server.load("chessboard.png"),
@@ -45,34 +49,11 @@ fn setup(
                 custom_size: Some(Vec2::new(520.0, 520.0)),
                 ..default()
             },
-            transform: Transform::from_scale(Vec3::new(1.11, 1.11, 1.0)),
+            transform: Transform::from_scale(Vec3::new(1.12, 1.1, 1.0)),
             ..default()
         },
         ChessBoard,
     ));
-    // implement clicking on board to move pieces
-    // for i in 0..=8 {
-    //     for j in 0..=9 {
-    //         let pos = grid2xy(i, j);
-    //         commands.spawn((
-    //             SpriteBundle {
-    //                 sprite: Sprite {
-    //                     custom_size: Some(Vec2::splat(GL)),
-    //                     ..default()
-    //                 },
-    //                 transform: Transform::from_translation(pos.extend(0.0)),
-    //                 ..default()
-    //             },
-    //             GridPoint{x: i, y: j},
-    //         ));
-    //     }
-    // }
-    // commands.spawn(MaterialMesh2dBundle {
-    //     mesh: meshes.add(shape::Circle::new(50.).into()).into(),
-    //     material: materials.add(ColorMaterial::from(Color::PURPLE)),
-    //     transform: Transform::from_translation(Vec3::new(-150., 0., 0.)),
-    //     ..default()
-    // });
 }
 
 
@@ -96,3 +77,57 @@ fn update_board_size(
     }
 }
 
+fn mouse_click_system(
+    buttons: Res<Input<MouseButton>>,
+    mut selected: ResMut<SelectedSquare>,
+    // query to get the window (so we can read the current cursor position)
+    q_window: Query<&Window, With<PrimaryWindow>>,
+    // query to get camera transform
+    q_camera: Query<(&Camera, &GlobalTransform), With<MainCamera>>,
+) {
+    if buttons.just_released(MouseButton::Left) {
+        // get the camera info and transform
+        // assuming there is exactly one main camera entity, so Query::single() is OK
+        let (camera, camera_transform) = q_camera.single();
+
+        // There is only one primary window, so we can similarly get it from the query:
+        let window = q_window.single();
+
+        // check if the cursor is inside the window and get its position
+        // then, ask bevy to convert into world coordinates, and truncate to discard Z
+        if let Some(world_position) = window.cursor_position()
+            .and_then(|cursor| camera.viewport_to_world(camera_transform, cursor))
+            .map(|ray| ray.origin.truncate())
+        {
+            info!("World coords: {}/{}", world_position.x, world_position.y);
+            if in_bound(&world_position) {
+                let pos = world_to_board(&world_position);
+                if let Some(old_pos) = selected.0 {
+                    info!("move ({},{}) to ({},{})", old_pos.0, old_pos.1, pos.0, pos.1);
+                    selected.0 = Some(pos);
+                } else {
+                    info!("select ({},{})",  pos.0, pos.1);
+                    selected.0 = Some(pos);
+                }
+            } else {
+                selected.0 = None;
+            }
+        }
+    }
+}
+
+fn in_bound(world_position: &Vec2) -> bool {
+    if world_position.x >= -4.5 * GL && world_position.x <= 4.5 * GL &&
+        world_position.y >= -5. * GL && world_position.y <= 5. * GL {
+            return true;
+    } else {
+        return false;
+    }
+}
+
+fn world_to_board(world_position: &Vec2) -> Pos {
+    return Pos {
+        0: ((world_position.x + 4.5 * GL) / GL) as u8,
+        1: ((world_position.y + 5.0 * GL) / GL) as u8,
+    }
+}

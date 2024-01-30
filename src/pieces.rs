@@ -1,10 +1,10 @@
 use bevy::prelude::*;
-use crate::{configs::GL, util::grid2xy, Pos, PosMap};
+use crate::{configs::GL, util::grid2xy, pos::{Pos,PosEntityMap}};
 
 pub fn create_pieces(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    mut piece_ents: ResMut<PosMap>,
+    mut piece_ents: ResMut<PosEntityMap>,
 ) {
     spawn_jiang(&mut commands, &asset_server, &mut piece_ents);
     spawn_shuai(&mut commands, &asset_server, &mut piece_ents);
@@ -19,7 +19,7 @@ pub fn create_pieces(
 fn spawn_shuai(
     commands: &mut Commands,
     asset_server: & Res<AssetServer>,
-    piece_ents: &mut ResMut<PosMap>,
+    piece_ents: &mut ResMut<PosEntityMap>,
 ) {
     let pos = Pos(4, 9);
     piece_ents.0.insert(
@@ -39,7 +39,7 @@ fn spawn_shuai(
 fn spawn_jiang(
     commands: &mut Commands,
     asset_server: & Res<AssetServer>,
-    piece_ents: &mut ResMut<PosMap>,
+    piece_ents: &mut ResMut<PosEntityMap>,
 ) {
     let pos = Pos(4, 0);
     piece_ents.0.insert(
@@ -59,7 +59,7 @@ fn spawn_jiang(
 fn spawn_shi(
     commands: &mut Commands,
     asset_server: & Res<AssetServer>,
-    piece_ents: &mut ResMut<PosMap>,
+    piece_ents: &mut ResMut<PosEntityMap>,
 ) {
     let positions = vec![
         Pos(3, 9),
@@ -90,7 +90,7 @@ fn spawn_shi(
 fn spawn_xiang(
     commands: &mut Commands,
     asset_server: & Res<AssetServer>,
-    piece_ents: &mut ResMut<PosMap>,
+    piece_ents: &mut ResMut<PosEntityMap>,
 ) {
     let positions = vec![
         Pos(2, 9),
@@ -121,7 +121,7 @@ fn spawn_xiang(
 fn spawn_ma(
     commands: &mut Commands,
     asset_server: & Res<AssetServer>,
-    piece_ents: &mut ResMut<PosMap>,
+    piece_ents: &mut ResMut<PosEntityMap>,
 ) {
     let positions = vec![
         Pos(1, 9),
@@ -152,7 +152,7 @@ fn spawn_ma(
 fn spawn_che(
     commands: &mut Commands,
     asset_server: & Res<AssetServer>,
-    piece_ents: &mut ResMut<PosMap>,
+    piece_ents: &mut ResMut<PosEntityMap>,
 ) {
     let positions = vec![
         Pos(0, 9),
@@ -183,7 +183,7 @@ fn spawn_che(
 fn spawn_pao(
     commands: &mut Commands,
     asset_server: & Res<AssetServer>,
-    piece_ents: &mut ResMut<PosMap>,
+    piece_ents: &mut ResMut<PosEntityMap>,
 ) {
     let positions = vec![
         Pos(1, 7),
@@ -214,7 +214,7 @@ fn spawn_pao(
 fn spawn_soldier(
     commands: &mut Commands,
     asset_server: & Res<AssetServer>,
-    piece_ents: &mut ResMut<PosMap>,
+    piece_ents: &mut ResMut<PosEntityMap>,
 ) {
     for i in vec![0, 2, 4, 6, 8] {
         let pos = Pos(i, 6);

@@ -1,27 +1,23 @@
 use crate::{
-    pos::{Pos, PosEntityMap}, 
-    pieces::create_pieces, 
+    configs::GL,
+    pos::{Pos, PosEntityMap},
+    chess::{ChessGame, PlayerColor},
     util::*,
-    configs::GL};
+};
 use bevy::{prelude::*, window::PrimaryWindow};
 
 use std::collections::HashMap;
 
-
 #[derive(Component)]
-pub struct ChessBoard;
+pub struct ChessBoardTexture;
 
 #[derive(Component)]
 struct MainCamera;
 
-
-fn setup(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>
-) {
+fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn((Camera2dBundle::default(), MainCamera));
     commands.spawn((
-        SpriteBundle{
+        SpriteBundle {
             texture: asset_server.load("chessboard.png"),
             sprite: Sprite {
                 custom_size: Some(Vec2::new(520.0, 520.0)),
@@ -30,7 +26,7 @@ fn setup(
             transform: Transform::from_scale(Vec3::new(1.12, 1.1, 1.0)),
             ..default()
         },
-        ChessBoard,
+        ChessBoardTexture,
     ));
 }
 
@@ -41,10 +37,8 @@ struct Game {
     last_move_time: f32,
 }
 
-
 #[derive(Resource, Default)]
 struct SelectedSquare(Option<Pos>);
-
 
 fn mouse_click_system(
     buttons: Res<Input<MouseButton>>,
@@ -65,7 +59,8 @@ fn mouse_click_system(
 
         // check if the cursor is inside the window and get its position
         // then, ask bevy to convert into world coordinates, and truncate to discard Z
-        if let Some(world_position) = window.cursor_position()
+        if let Some(world_position) = window
+            .cursor_position()
             .and_then(|cursor| camera.viewport_to_world(camera_transform, cursor))
             .map(|ray| ray.origin.truncate())
         {
@@ -73,7 +68,10 @@ fn mouse_click_system(
             if in_bound(&world_position) {
                 let pos = world_to_board(&world_position);
                 if let Some(old_pos) = selected.0 {
-                    info!("move ({},{}) to ({},{})", old_pos.0, old_pos.1, pos.0, pos.1);
+                    info!(
+                        "move ({},{}) to ({},{})",
+                        old_pos.0, old_pos.1, pos.0, pos.1
+                    );
                     if old_pos.0 != pos.0 || old_pos.1 != pos.1 {
                         game.to_play = Some((old_pos, pos));
                         selected.0 = None;
@@ -81,7 +79,12 @@ fn mouse_click_system(
                         selected.0 = Some(pos);
                     }
                 } else {
-                    info!("select ({},{}), world position:({})",  pos.0, pos.1, board_to_world(pos).translation);
+                    info!(
+                        "select ({},{}), world position:({})",
+                        pos.0,
+                        pos.1,
+                        board_to_world(pos).translation
+                    );
                     selected.0 = Some(pos);
                 }
             } else {
@@ -107,7 +110,7 @@ fn play_move(
         return;
     }
     if let Some((from, to)) = game.to_play {
-        let ent = *piece_ents.0.get(&from).unwrap(); // 值复制
+        let ent = *piece_ents.0.get(&from).unwrap(); // use * to copy value, not immutable borrow
         commands.entity(ent).insert(MovingTo(board_to_world(to)));
         if let Some(o_ent) = piece_ents.0.get(&to) {
             commands.entity(*o_ent).insert(Die);
@@ -138,12 +141,40 @@ fn move_to(
     }
 }
 
-fn die(
-    mut commands: Commands,
-    query: Query<Entity, With<Die>>,
-) {
+fn die(mut commands: Commands, query: Query<Entity, With<Die>>) {
     for ent in query.iter() {
         commands.entity(ent).despawn();
+    }
+}
+
+fn place_pieces(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut piece_ents: ResMut<PosEntityMap>,
+    chess_game: Res<ChessGame>,
+) {
+    for (i, grid) in chess_game.board.points.iter().enumerate() {
+        if let Some((color, piece)) = grid {
+            let pos = chess_game.board.pos(i);
+            let texture = match color {
+                PlayerColor::Red => format!("red/{}.png", piece),
+                PlayerColor::Black => format!("black/{}.png", piece),
+            };
+            piece_ents.0.insert(
+                pos,
+                commands
+                    .spawn(SpriteBundle {
+                        texture: asset_server.load(texture),
+                        sprite: Sprite {
+                            custom_size: Some(Vec2::splat(GL)),
+                            ..Default::default()
+                        },
+                        transform: board_to_world(pos),
+                        ..Default::default()
+                    })
+                    .id(),
+            );
+        }
     }
 }
 
@@ -153,11 +184,11 @@ impl Plugin for ChineseChess {
     fn build(&self, app: &mut App) {
         // add things to your app here
         app.insert_resource(PosEntityMap(HashMap::<Pos, Entity>::new()))
-        .insert_resource(SelectedSquare(None))
-        .insert_resource(Game::default())
-        .add_systems(Startup, (setup, create_pieces))
-        .add_systems(Update, mouse_click_system)
-        .add_systems(Update, (play_move, move_to, die));
+            .insert_resource(SelectedSquare(None))
+            .insert_resource(Game::default())
+            .insert_resource(ChessGame::new())
+            .add_systems(Startup, (setup, place_pieces))
+            .add_systems(Update, mouse_click_system)
+            .add_systems(Update, (play_move, move_to, die));
     }
 }
-

@@ -3,8 +3,9 @@ mod pieces;
 mod util;
 mod game;
 mod pos;
+mod chess;
 use configs::*;
-use game::{ChineseChess, ChessBoard};
+use game::{ChineseChess, ChessBoardTexture};
 
 use bevy::prelude::*;
 
@@ -29,7 +30,7 @@ fn main() {
 
 // for debug adjusting the board picture size
 fn update_board_size(
-    mut query: Query<&mut Transform, With<ChessBoard>>,
+    mut query: Query<&mut Transform, With<ChessBoardTexture>>,
     keycode: Res<Input<KeyCode>>,
 ) {
     let mut chessboard_transform = query.single_mut();

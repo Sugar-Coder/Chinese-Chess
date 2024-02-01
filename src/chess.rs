@@ -1,7 +1,7 @@
-use crate::{configs::{BH, BW}, pos::Pos};
+use crate::{configs::{BH, BW, GL}, pos::Pos};
 use bevy::prelude::*;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum PlayerColor {
     Black,
     Red,
@@ -14,6 +14,11 @@ impl PlayerColor {
             PlayerColor::Red => PlayerColor::Black,
         }
     }
+}
+
+pub enum Action {
+    Go(Pos),
+    Take(Pos),
 }
 
 #[derive(Clone, Copy)]
@@ -45,11 +50,15 @@ type Grid = Option<(PlayerColor, Piece)>;
 
 pub struct Board {
     pub points: Vec<Grid>,
+    pub center: Vec2, // world coordinate of the center of the board
 }
 
 impl Board {
     pub fn new() -> Board {
-        Board { points: vec![None; BW * BH] }
+        Board { 
+            points: vec![None; BW * BH],
+            center: Vec2::new(0.0, 0.0),
+        }
     }
 
     pub fn i(&self, pos: Pos) -> usize {
@@ -58,6 +67,17 @@ impl Board {
 
     pub fn pos(&self, i: usize) -> Pos {
         return Pos{0: (i % BW) as i32, 1: (i / BW) as i32};
+    }
+
+    fn in_bound(&self, pos: Pos) -> bool {
+        return pos.0 <= 8 && pos.0 >= 0 && pos.1 >= 0 && pos.1 <= 9;
+    }
+
+    pub fn get(&self, pos: Pos) -> Option<&Grid> {
+        if !self.in_bound(pos) {
+            return None;
+        }
+        return Some(&self.points[self.i(pos)]);
     }
 }
 
@@ -75,6 +95,74 @@ impl ChessGame {
             turn: 0,
             player: None,
         }
+    }
+
+    pub fn in_bound(&self, world_position: &Vec2) -> bool {
+        let on_board_position = *world_position - self.board.center;
+        if on_board_position.x >= -4.5 * GL && on_board_position.x <= 4.5 * GL &&
+        on_board_position.y >= -5. * GL && on_board_position.y <= 5. * GL {
+                return true;
+        } else {
+            return false;
+        }
+    }
+
+    pub fn world_to_board(&self, world_position: &Vec2) -> Pos {
+        // world position must on board
+        let on_board_position = *world_position - self.board.center;
+        return Pos {
+            0: ((on_board_position.x + 4.5 * GL) / GL) as i32,
+            1: ((on_board_position.y + 5.0 * GL) / GL) as i32,
+        }
+    }
+
+    pub fn board_to_world(&self, pos: Pos) -> Transform {
+        Transform::from_xyz(
+            (pos.0 as f32 - 4.0) * GL + self.board.center.x, 
+            (pos.1 as f32 - 4.5) * GL + self.board.center.y, 
+            1.0
+        )
+    }
+
+    // for movement judgement
+    pub fn save_moves(&self, piece: Piece, from: Pos) -> Vec<Action> {
+        self.board.filter_save_moves(
+            self.player.unwrap(),
+            from,
+            piece.moves(&self.board, from, self.player.unwrap()),
+        )
+    }
+
+    pub fn playable_moves(&self, from: Pos) -> Option<Vec<Action>> {
+        if let Some(Some((color, piece))) = self.board.get(from) {
+            if self.turn == 0 { // who first attemp to move
+                self.player = Some(*color);
+            }
+            if self.player == Some(*color) {
+                return Some(self.save_moves(*piece, from));
+            }
+        }
+        None
+    }
+
+    pub fn playable_move(&self, from: Pos, to: Pos) -> Option<Action> {
+        if let Some(moves) = self.playable_moves(from) {
+            for action in moves {
+                match action {
+                    Action::Go(pos) => {
+                        if pos == to {
+                            return Some(action);
+                        }
+                    },
+                    Action::Take(pos) => {
+                        if pos == to {
+                            return Some(action);
+                        }
+                    },
+                }
+            }
+        }
+        None
     }
 }
 

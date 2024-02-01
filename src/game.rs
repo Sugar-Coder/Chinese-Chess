@@ -48,6 +48,7 @@ fn mouse_click_system(
     // query to get camera transform
     q_camera: Query<(&Camera, &GlobalTransform), With<MainCamera>>,
     mut game: ResMut<Game>,
+    chess: Res<ChessGame>,
 ) {
     if buttons.just_released(MouseButton::Left) {
         // get the camera info and transform
@@ -65,8 +66,8 @@ fn mouse_click_system(
             .map(|ray| ray.origin.truncate())
         {
             info!("World coords: {}/{}", world_position.x, world_position.y);
-            if in_bound(&world_position) {
-                let pos = world_to_board(&world_position);
+            if chess.in_bound(&world_position) {
+                let pos = chess.world_to_board(&world_position);
                 if let Some(old_pos) = selected.0 {
                     info!(
                         "move ({},{}) to ({},{})",
@@ -83,7 +84,7 @@ fn mouse_click_system(
                         "select ({},{}), world position:({})",
                         pos.0,
                         pos.1,
-                        board_to_world(pos).translation
+                        chess.board_to_world(pos).translation
                     );
                     selected.0 = Some(pos);
                 }
@@ -104,6 +105,7 @@ fn play_move(
     mut commands: Commands,
     mut piece_ents: ResMut<PosEntityMap>,
     mut game: ResMut<Game>,
+    chess: Res<ChessGame>,
     time: Res<Time>,
 ) {
     if time.elapsed_seconds() - game.last_move_time < 1. {
@@ -111,7 +113,7 @@ fn play_move(
     }
     if let Some((from, to)) = game.to_play {
         let ent = *piece_ents.0.get(&from).unwrap(); // use * to copy value, not immutable borrow
-        commands.entity(ent).insert(MovingTo(board_to_world(to)));
+        commands.entity(ent).insert(MovingTo(chess.board_to_world(to)));
         if let Some(o_ent) = piece_ents.0.get(&to) {
             commands.entity(*o_ent).insert(Die);
         }
@@ -151,11 +153,11 @@ fn place_pieces(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut piece_ents: ResMut<PosEntityMap>,
-    chess_game: Res<ChessGame>,
+    chess: Res<ChessGame>,
 ) {
-    for (i, grid) in chess_game.board.points.iter().enumerate() {
+    for (i, grid) in chess.board.points.iter().enumerate() {
         if let Some((color, piece)) = grid {
-            let pos = chess_game.board.pos(i);
+            let pos = chess.board.pos(i);
             let texture = match color {
                 PlayerColor::Red => format!("red/{}.png", piece),
                 PlayerColor::Black => format!("black/{}.png", piece),
@@ -169,7 +171,7 @@ fn place_pieces(
                             custom_size: Some(Vec2::splat(GL)),
                             ..Default::default()
                         },
-                        transform: board_to_world(pos),
+                        transform: chess.board_to_world(pos),
                         ..Default::default()
                     })
                     .id(),

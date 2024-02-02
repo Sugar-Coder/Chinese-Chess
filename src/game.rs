@@ -1,8 +1,8 @@
 use crate::{
     configs::GL,
     pos::{Pos, PosEntityMap},
-    chess::{ChessGame, PlayerColor},
-    util::*,
+    chess::ChessGame,
+    pieces::{PlayerColor, Action},
 };
 use bevy::{prelude::*, window::PrimaryWindow};
 
@@ -32,7 +32,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 
 #[derive(Resource, Default)]
 struct Game {
-    to_play: Option<(Pos, Pos)>,
+    to_play: Option<(Pos, Action)>,
     turn: u32,
     last_move_time: f32,
 }
@@ -69,23 +69,18 @@ fn mouse_click_system(
             if chess.in_bound(&world_position) {
                 let pos = chess.world_to_board(&world_position);
                 if let Some(old_pos) = selected.0 {
-                    info!(
-                        "move ({},{}) to ({},{})",
-                        old_pos.0, old_pos.1, pos.0, pos.1
-                    );
-                    if old_pos.0 != pos.0 || old_pos.1 != pos.1 {
-                        game.to_play = Some((old_pos, pos));
+                    // info!(
+                    //     "move ({},{}) to ({},{})",
+                    //     old_pos.0, old_pos.1, pos.0, pos.1
+                    // );
+                    if let Some(action) = chess.playable_move(old_pos, pos) {
+                        game.to_play = Some((old_pos, action));
+                        info!("Goto ({}, {})", pos.0, pos.1);
                         selected.0 = None;
                     } else {
-                        selected.0 = Some(pos);
+                        selected.0 = None;
                     }
                 } else {
-                    info!(
-                        "select ({},{}), world position:({})",
-                        pos.0,
-                        pos.1,
-                        chess.board_to_world(pos).translation
-                    );
                     selected.0 = Some(pos);
                 }
             } else {
@@ -105,21 +100,30 @@ fn play_move(
     mut commands: Commands,
     mut piece_ents: ResMut<PosEntityMap>,
     mut game: ResMut<Game>,
-    chess: Res<ChessGame>,
+    mut chess: ResMut<ChessGame>,
     time: Res<Time>,
 ) {
     if time.elapsed_seconds() - game.last_move_time < 1. {
         return;
     }
-    if let Some((from, to)) = game.to_play {
+    if let Some((from, action)) = game.to_play {
         let ent = *piece_ents.0.get(&from).unwrap(); // use * to copy value, not immutable borrow
-        commands.entity(ent).insert(MovingTo(chess.board_to_world(to)));
-        if let Some(o_ent) = piece_ents.0.get(&to) {
-            commands.entity(*o_ent).insert(Die);
+        match action {
+            Action::Go(to) => {
+                commands.entity(ent).insert(MovingTo(chess.board_to_world(to)));
+                piece_ents.0.insert(to, ent);
+            },
+            Action::Take(pos) => {
+                commands.entity(ent).insert(MovingTo(chess.board_to_world(pos)));
+                piece_ents.0.insert(pos, ent);
+                if let Some(o_ent) = piece_ents.0.get(&pos) {
+                    commands.entity(*o_ent).insert(Die);
+                }
+            }
         }
         piece_ents.0.remove_entry(&from);
-        piece_ents.0.insert(to, ent);
         game.to_play = None;
+        chess.play(from, action);
     }
 }
 

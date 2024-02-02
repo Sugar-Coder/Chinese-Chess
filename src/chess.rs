@@ -1,53 +1,11 @@
 use crate::{configs::{BH, BW, GL}, pos::Pos};
+use crate::pieces::{Action, Piece, PlayerColor};
 use bevy::prelude::*;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum PlayerColor {
-    Black,
-    Red,
-}
-
-impl PlayerColor {
-    pub fn next(self) -> Self {
-        match self {
-            PlayerColor::Black => PlayerColor::Red,
-            PlayerColor::Red => PlayerColor::Black,
-        }
-    }
-}
-
-pub enum Action {
-    Go(Pos),
-    Take(Pos),
-}
-
-#[derive(Clone, Copy)]
-pub enum Piece {
-    Jiang,
-    Shi,
-    Xiang,
-    Ma,
-    Che,
-    Pao,
-    Bing,
-}
-
-impl std::fmt::Display for Piece {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Piece::Jiang => write!(f, "jiang"),
-            Piece::Shi => write!(f, "shi"),
-            Piece::Xiang => write!(f, "xiang"),
-            Piece::Ma => write!(f, "ma"),
-            Piece::Che => write!(f, "che"),
-            Piece::Pao => write!(f, "pao"),
-            Piece::Bing => write!(f, "bing"),
-        }
-    }
-}
 
 type Grid = Option<(PlayerColor, Piece)>;
 
+#[derive(Clone)]
 pub struct Board {
     pub points: Vec<Grid>,
     pub center: Vec2, // world coordinate of the center of the board
@@ -69,15 +27,49 @@ impl Board {
         return Pos{0: (i % BW) as i32, 1: (i / BW) as i32};
     }
 
-    fn in_bound(&self, pos: Pos) -> bool {
+    fn in_board(&self, pos: Pos) -> bool {
         return pos.0 <= 8 && pos.0 >= 0 && pos.1 >= 0 && pos.1 <= 9;
     }
 
     pub fn get(&self, pos: Pos) -> Option<&Grid> {
-        if !self.in_bound(pos) {
+        // 超出界外返回None
+        if !self.in_board(pos) {
             return None;
         }
         return Some(&self.points[self.i(pos)]);
+    }
+
+    pub fn set(&mut self, pos: Pos, grid: Grid) {
+        if self.in_board(pos) {
+            let idx = self.i(pos);
+            self.points[idx] = grid;
+        }
+    }
+
+    pub fn filter_save_moves(&self, color: PlayerColor, from: Pos, actions: Vec<Action>) -> Vec<Action> {
+        info!(
+            "available actions count={}",
+            actions.len()
+        );
+        actions
+    }
+
+    pub fn play(&self, from: Pos, action: Action) -> Self {
+        let mut res = self.clone();
+        if let Some((c, p)) = self.get(from).unwrap() {
+            match action {
+                Action::Go(to) => {
+                    res.set(from, None);
+                    info!("setting Pos({},{}) to {}", to.0, to.1, *p);
+                    res.set(to, Some((*c, *p)));
+                },
+                Action::Take(to) => {
+                    res.set(from, None);
+                    res.set(to, Some((*c, *p)));
+                }
+            }
+        }
+        res
     }
 }
 
@@ -125,21 +117,23 @@ impl ChessGame {
     }
 
     // for movement judgement
-    pub fn save_moves(&self, piece: Piece, from: Pos) -> Vec<Action> {
+    pub fn save_moves(&self, piece: Piece, from: Pos, color: PlayerColor) -> Vec<Action> {
         self.board.filter_save_moves(
-            self.player.unwrap(),
+            color,
             from,
-            piece.moves(&self.board, from, self.player.unwrap()),
+            piece.moves(&self.board, from, color),
         )
     }
 
     pub fn playable_moves(&self, from: Pos) -> Option<Vec<Action>> {
         if let Some(Some((color, piece))) = self.board.get(from) {
-            if self.turn == 0 { // who first attemp to move
-                self.player = Some(*color);
-            }
-            if self.player == Some(*color) {
-                return Some(self.save_moves(*piece, from));
+            // if self.turn == 0 { // who first attemp to move
+            //     self.player = Some(*color);
+            // }
+            if self.turn == 0 || self.player == Some(*color) {
+                return Some(self.save_moves(*piece, from, *color));
+            } else {
+                info!("Not your turn");
             }
         }
         None
@@ -163,6 +157,18 @@ impl ChessGame {
             }
         }
         None
+    }
+
+    pub fn play(&mut self, from: Pos, action: Action) {
+        if let Some((c, _)) = self.board.get(from).unwrap() {
+            if let Some(color) = self.player {
+                self.player = Some(color.next());
+            } else {
+                self.player = Some(c.next());
+            }
+            self.turn += 1;
+            self.board = self.board.play(from, action);
+        }
     }
 }
 

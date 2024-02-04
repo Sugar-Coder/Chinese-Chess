@@ -14,7 +14,11 @@ pub struct ChessBoardTexture;
 #[derive(Component)]
 struct MainCamera;
 
-fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+fn setup(
+    mut commands: Commands, 
+    asset_server: Res<AssetServer>,
+    chess: Res<ChessGame>,
+) {
     commands.spawn((Camera2dBundle::default(), MainCamera));
     commands.spawn((
         SpriteBundle {
@@ -23,7 +27,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
                 custom_size: Some(Vec2::new(520.0, 520.0)),
                 ..default()
             },
-            transform: Transform::from_scale(Vec3::new(1.12, 1.1, 1.0)),
+            transform: Transform::from_translation(chess.board.center.extend(0.0)).with_scale(Vec3::new(1.12, 1.1, 1.0)),
             ..default()
         },
         ChessBoardTexture,
@@ -33,7 +37,6 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 #[derive(Resource, Default)]
 struct Game {
     to_play: Option<(Pos, Action)>,
-    turn: u32,
     last_move_time: f32,
 }
 
@@ -69,6 +72,15 @@ fn mouse_click_system(
             if chess.in_bound(&world_position) {
                 let pos = chess.world_to_board(&world_position);
                 if let Some(old_pos) = selected.0 {
+                    if let Some(Some((o_c, _))) = chess.board.get(old_pos) {
+                        if let Some(Some((c, _))) = chess.board.get(pos) {
+                            // same color piece selection
+                            if *o_c == *c {
+                                selected.0 = Some(pos);
+                                return;
+                            }
+                        }
+                    }
                     if let Some(action) = chess.playable_move(old_pos, pos) {
                         game.to_play = Some((old_pos, action));
                         info!("Goto ({}, {})", pos.0, pos.1);
@@ -86,6 +98,43 @@ fn mouse_click_system(
                 }
             } else {
                 selected.0 = None;
+            }
+        }
+    }
+}
+
+#[derive(Component)]
+struct MoveDisplay;
+
+fn display_moves(
+    query: Query<Entity, With<MoveDisplay>>,
+    mut commands: Commands,
+    selected: Res<SelectedSquare>,
+    chess: Res<ChessGame>,
+    asset_server: Res<AssetServer>,
+) {
+    if selected.is_changed() {
+        for move_display in query.iter() {
+            commands.entity(move_display).despawn();
+        }
+        if let Some(pos) = selected.0 {
+            if let Some(moves) = chess.playable_moves(pos) {
+                let sprite = SpriteBundle {
+                    sprite: Sprite {
+                        color: Color::rgba(0., 0., 0., 0.5),
+                        custom_size: Some(Vec2::new(GL / 2.5, GL / 2.5)),
+                        ..Default::default()
+                    },
+                    texture: asset_server.load("circle.png"),
+                    ..Default::default()
+                };
+                for action in moves {
+                    if let Action::Go(to) = action {
+                        let mut sprite_clone = sprite.clone();
+                        sprite_clone.transform = chess.board_to_world(to);
+                        commands.spawn(sprite_clone).insert(MoveDisplay);
+                    }
+                }
             }
         }
     }
@@ -195,7 +244,7 @@ impl Plugin for ChineseChess {
             .insert_resource(Game::default())
             .insert_resource(ChessGame::new())
             .add_systems(Startup, (setup, place_pieces))
-            .add_systems(Update, mouse_click_system)
+            .add_systems(Update, (mouse_click_system, display_moves))
             .add_systems(Update, (play_move, move_to, die));
     }
 }

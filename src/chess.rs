@@ -1,4 +1,4 @@
-use crate::{configs::{BH, BW, GL}, pos::Pos};
+use crate::{configs::{BH, BW, GL, BCX, BCY}, pos::Pos};
 use crate::pieces::{Action, Piece, PlayerColor};
 use bevy::prelude::*;
 
@@ -15,7 +15,7 @@ impl Board {
     pub fn new() -> Board {
         Board { 
             points: vec![None; BW * BH],
-            center: Vec2::new(0.0, 0.0),
+            center: Vec2::new(BCX, BCY),
         }
     }
 

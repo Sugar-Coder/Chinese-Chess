@@ -60,10 +60,11 @@ impl Board {
             match action {
                 Action::Go(to) => {
                     res.set(from, None);
-                    info!("setting Pos({},{}) to {}", to.0, to.1, *p);
+                    info!("setting Pos{} to {}", to, *p);
                     res.set(to, Some((*c, *p)));
                 },
                 Action::Take(to) => {
+                    info!("{} taking Pos{}", *p, to);
                     res.set(from, None);
                     res.set(to, Some((*c, *p)));
                 }

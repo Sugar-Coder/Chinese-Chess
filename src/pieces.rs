@@ -1,5 +1,3 @@
-use bevy::log::{debug, info};
-
 use crate::{pos::Pos, chess::Board};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -113,20 +111,20 @@ fn shi_moves(board: &Board, from: Pos, color: PlayerColor) -> Vec<Action> {
 }
 
 fn xiang_moves(board: &Board, from: Pos, color: PlayerColor) -> Vec<Action> {
-    info!("xiang moving...");
     let dirs = vec![Pos(-2, -2), Pos(2, 2), Pos(-2, 2), Pos(2, -2)];
     let mut bound = vec![Pos(0, 0), Pos(8, 4)];
     if color == PlayerColor::Black {
         bound[0].1 += 5;
         bound[1].1 += 5;
     }
-    info!("bound {}, {}", bound[0], bound[1]);
     let mut actions = vec![];
     for dir in dirs {
         let to = from + dir;
         if to.in_bound(bound[0], bound[1]) {
+            if let Some(Some((_, _))) = board.get(from + Pos(dir.0 / 2, dir.1 / 2)) {
+                continue; // blocked
+            }
             if let Some(grid) = board.get(to) {
-                info!("xiang: {} inside", to);
                 if let Some((c, _)) = grid {
                     if *c != color {
                         actions.push(Action::Take(to));
@@ -135,8 +133,6 @@ fn xiang_moves(board: &Board, from: Pos, color: PlayerColor) -> Vec<Action> {
                     actions.push(Action::Go(to));
                 }
             }
-        } else {
-            info!("xiang:{} Not inside", to);
         }
     }
     actions

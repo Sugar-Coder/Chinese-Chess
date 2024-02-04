@@ -65,14 +65,10 @@ fn mouse_click_system(
             .and_then(|cursor| camera.viewport_to_world(camera_transform, cursor))
             .map(|ray| ray.origin.truncate())
         {
-            info!("World coords: {}/{}", world_position.x, world_position.y);
+            // info!("World coords: {}/{}", world_position.x, world_position.y);
             if chess.in_bound(&world_position) {
                 let pos = chess.world_to_board(&world_position);
                 if let Some(old_pos) = selected.0 {
-                    // info!(
-                    //     "move ({},{}) to ({},{})",
-                    //     old_pos.0, old_pos.1, pos.0, pos.1
-                    // );
                     if let Some(action) = chess.playable_move(old_pos, pos) {
                         game.to_play = Some((old_pos, action));
                         info!("Goto ({}, {})", pos.0, pos.1);
@@ -81,7 +77,12 @@ fn mouse_click_system(
                         selected.0 = None;
                     }
                 } else {
-                    selected.0 = Some(pos);
+                    if let Some(Some((_, p))) = chess.board.get(pos) {
+                        selected.0 = Some(pos);
+                        info!("selecting {}", p);
+                    } else {
+                        selected.0 = None;
+                    }
                 }
             } else {
                 selected.0 = None;
@@ -115,10 +116,10 @@ fn play_move(
             },
             Action::Take(pos) => {
                 commands.entity(ent).insert(MovingTo(chess.board_to_world(pos)));
-                piece_ents.0.insert(pos, ent);
                 if let Some(o_ent) = piece_ents.0.get(&pos) {
                     commands.entity(*o_ent).insert(Die);
                 }
+                piece_ents.0.insert(pos, ent);
             }
         }
         piece_ents.0.remove_entry(&from);

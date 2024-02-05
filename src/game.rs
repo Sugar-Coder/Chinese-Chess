@@ -107,17 +107,17 @@ fn button_system(
                 if text.sections[0].value == "restart" {
                     game.state = GameState::Starting;
                     chess.restart();
+                } else if text.sections[0].value == "regret" {
+                    if chess.regret() {
+                        game.state = GameState::Starting;
+                    }
                 }
             }
             Interaction::Hovered => {
-                // text.sections[0].value = "Hover".to_string();
-                info!("Hover {}", text.sections[0].value);
                 *color = HOVERED_BUTTON.into();
                 border_color.0 = Color::WHITE;
             }
             Interaction::None => {
-                // text.sections[0].value = "Button".to_string();
-                info!("Normal {}", text.sections[0].value);
                 *color = NORMAL_BUTTON.into();
                 border_color.0 = Color::BLACK;
             }

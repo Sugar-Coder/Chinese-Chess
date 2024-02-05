@@ -23,7 +23,7 @@ fn main() {
             })
         )
         .add_plugins(ChineseChess)
-        .add_systems(Update, update_board_size)
+        // .add_systems(Update, update_board_size)
         .run();
 }
 

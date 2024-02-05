@@ -10,3 +10,5 @@ pub const BCY: f32 = 20.0; // board center y
 pub const BW: usize = 9; // board width, horizontal axis
 pub const BH: usize = 10; // board height, vertical axis
 
+// Max regret steps
+pub const MAX_REGRET: usize = 4;

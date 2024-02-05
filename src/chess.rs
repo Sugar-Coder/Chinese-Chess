@@ -1,4 +1,4 @@
-use crate::{configs::{BH, BW, GL, BCX, BCY}, pos::Pos};
+use crate::{configs::{BH, BW, GL, BCX, BCY, MAX_REGRET}, pos::Pos};
 use crate::pieces::{Action, Piece, PlayerColor};
 use bevy::prelude::*;
 
@@ -79,6 +79,7 @@ pub struct ChessGame {
     pub board: Board,
     pub turn: u32,
     pub player: Option<PlayerColor>,
+    memo: Vec<Board>,
 }
 
 impl ChessGame {
@@ -87,6 +88,7 @@ impl ChessGame {
             board: make_board(),
             turn: 0,
             player: None,
+            memo: vec![],
         }
     }
 
@@ -168,6 +170,10 @@ impl ChessGame {
                 self.player = Some(c.next());
             }
             self.turn += 1;
+            self.memo.push(self.board.clone());
+            if self.memo.len() > MAX_REGRET {
+                self.memo.remove(0);
+            }
             self.board = self.board.play(from, action);
         }
     }
@@ -176,6 +182,17 @@ impl ChessGame {
         self.board = make_board();
         self.player = None;
         self.turn = 0;
+        self.memo = vec![];
+    }
+
+    pub fn regret(&mut self) -> bool {
+        if self.memo.len() > 0 {
+            self.board = self.memo.pop().unwrap();
+            self.turn -= 1;
+            self.player = Some(self.player.unwrap().next());
+            return true;
+        }
+        return false;
     }
 }
 

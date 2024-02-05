@@ -171,6 +171,12 @@ impl ChessGame {
             self.board = self.board.play(from, action);
         }
     }
+
+    pub fn restart(&mut self) {
+        self.board = make_board();
+        self.player = None;
+        self.turn = 0;
+    }
 }
 
 fn make_board() -> Board {

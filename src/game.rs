@@ -14,6 +14,10 @@ pub struct ChessBoardTexture;
 #[derive(Component)]
 struct MainCamera;
 
+const NORMAL_BUTTON: Color = Color::rgb(0.15, 0.15, 0.15);
+const HOVERED_BUTTON: Color = Color::rgb(0.25, 0.25, 0.25);
+const PRESSED_BUTTON: Color = Color::rgb(0.35, 0.75, 0.35);
+
 fn setup(
     mut commands: Commands, 
     asset_server: Res<AssetServer>,
@@ -32,11 +36,111 @@ fn setup(
         },
         ChessBoardTexture,
     ));
+    commands.spawn(NodeBundle {
+        style: Style {
+            position_type: PositionType::Absolute,
+            width: Val::Percent(100.0),
+            height: Val::Px(50.0),
+            bottom: Val::Percent(0.0),
+            align_items: AlignItems::Center,
+            justify_content: JustifyContent::Center,
+            ..default()
+        },
+        // background_color: BackgroundColor(Color::RED),
+        ..default()
+    })
+    .with_children(|parent| {
+        for button_text in vec!["regret", "restart"] {
+            parent.spawn(
+                ButtonBundle {
+                    style: Style {
+                        width: Val::Px(150.0),
+                        height: Val::Px(50.0),
+                        border: UiRect::all(Val::Px(5.0)),
+                        // horizontally center child text
+                        justify_content: JustifyContent::Center,
+                        // vertically center child text
+                        align_items: AlignItems::Center,
+                        margin: UiRect{left: Val::Px(10.0), ..default()},
+                        ..default()
+                    },
+                    border_color: BorderColor(Color::BLACK),
+                    background_color: NORMAL_BUTTON.into(),
+                    ..default()
+                })
+                .with_children(|parent| {
+                    parent.spawn(TextBundle::from_section(
+                        button_text,
+                        TextStyle {
+                            font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                            font_size: 40.0,
+                            color: Color::rgb(0.9, 0.9, 0.9),
+                        },
+                    ));
+                });
+        }
+    });
+}
+
+fn button_system(
+    mut interaction_query: Query<
+        (
+            &Interaction,
+            &mut BackgroundColor,
+            &mut BorderColor,
+            &Children,
+        ),
+        (Changed<Interaction>, With<Button>),
+    >,
+    text_query: Query<&Text>,
+    mut game: ResMut<Game>,
+    mut chess: ResMut<ChessGame>,
+) {
+    for (interaction, mut color, mut border_color, children) in &mut interaction_query {
+        let text = text_query.get(children[0]).unwrap();
+        match *interaction {
+            Interaction::Pressed => {
+                // text.sections[0].value = "Press".to_string();
+                info!("Press {}", text.sections[0].value);
+                *color = PRESSED_BUTTON.into();
+                border_color.0 = Color::RED;
+                if text.sections[0].value == "restart" {
+                    game.state = GameState::Starting;
+                    chess.restart();
+                }
+            }
+            Interaction::Hovered => {
+                // text.sections[0].value = "Hover".to_string();
+                info!("Hover {}", text.sections[0].value);
+                *color = HOVERED_BUTTON.into();
+                border_color.0 = Color::WHITE;
+            }
+            Interaction::None => {
+                // text.sections[0].value = "Button".to_string();
+                info!("Normal {}", text.sections[0].value);
+                *color = NORMAL_BUTTON.into();
+                border_color.0 = Color::BLACK;
+            }
+        }
+    }
+}
+
+#[derive(PartialEq)]
+enum GameState {
+    Playing,
+    Starting,
+}
+
+impl Default for GameState {
+    fn default() -> Self {
+        GameState::Starting
+    }
 }
 
 #[derive(Resource, Default)]
 struct Game {
     to_play: Option<(Pos, Action)>,
+    state: GameState,
     last_move_time: f32,
 }
 
@@ -207,8 +311,16 @@ fn place_pieces(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut piece_ents: ResMut<PosEntityMap>,
+    mut game: ResMut<Game>,
     chess: Res<ChessGame>,
 ) {
+    if game.state != GameState::Starting {
+        return;
+    }
+    for (_, ent) in piece_ents.0.iter() {
+        commands.entity(*ent).despawn();
+    }
+    piece_ents.0.clear();
     for (i, grid) in chess.board.points.iter().enumerate() {
         if let Some((color, piece)) = grid {
             let pos = chess.board.pos(i);
@@ -232,6 +344,7 @@ fn place_pieces(
             );
         }
     }
+    game.state = GameState::Playing;
 }
 
 pub struct ChineseChess;
@@ -243,8 +356,8 @@ impl Plugin for ChineseChess {
             .insert_resource(SelectedSquare(None))
             .insert_resource(Game::default())
             .insert_resource(ChessGame::new())
-            .add_systems(Startup, (setup, place_pieces))
-            .add_systems(Update, (mouse_click_system, display_moves))
+            .add_systems(Startup, setup)
+            .add_systems(Update, (place_pieces, mouse_click_system, display_moves, button_system))
             .add_systems(Update, (play_move, move_to, die));
     }
 }
